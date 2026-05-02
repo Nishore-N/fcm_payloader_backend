@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors');
 const bodyParser = require('body-parser');
 const fs = require('fs-extra');
 const { GoogleAuth } = require('google-auth-library');
@@ -10,6 +11,19 @@ const PAYLOADS_FILE = path.join(__dirname, 'payloads.json');
 const SERVICE_ACCOUNT_FILE = path.join(__dirname, 'service-account.json');
 
 app.use(bodyParser.json());
+// Global Error Handler for JSON parsing errors
+app.use((err, req, res, next) => {
+    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+        return res.status(400).json({ error: 'Invalid JSON payload' });
+    }
+    next();
+});
+
+app.use(cors({
+    origin: ['https://fcm-payloader-frontend.onrender.com', 'http://localhost:3000'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Serve Original JS Frontend
 app.use('/', express.static(path.join(__dirname, '../frontend')));
@@ -135,11 +149,24 @@ async function sendFCM(data) {
     return result;
 }
 
+// Catch-all for 404 (must be after all other routes)
+app.use((req, res) => {
+    res.status(404).json({ 
+        error: 'API Endpoint Not Found', 
+        path: req.path,
+        tip: 'Ensure your frontend is calling the correct backend URL.' 
+    });
+});
+
 app.listen(PORT, () => {
+    const RENDER_URL = 'https://fcm-payloader-frontend.onrender.com';
     console.log(`\n🚀 Backend Server Running!`);
     console.log(`----------------------------------`);
-    console.log(`Standard JS   : https://fcm-payloader-frontend.onrender.com/`);
-    console.log(`Vanilla TS    : http://localhost:${PORT}/ts`);
-    console.log(`React TSX     : http://localhost:${PORT}/react`);
+    console.log(`Local Access  : http://localhost:${PORT}`);
+    console.log(`Render Deploy : ${RENDER_URL}`);
+    console.log(`----------------------------------`);
+    console.log(`Standard JS   : ${RENDER_URL}`);
+    console.log(`Vanilla TS    : ${RENDER_URL}/ts`);
+    console.log(`React TSX     : ${RENDER_URL}/react`);
     console.log(`----------------------------------\n`);
 });
