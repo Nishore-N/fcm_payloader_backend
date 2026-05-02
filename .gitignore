@@ -1,0 +1,4 @@
+node_modules/
+payloads.json
+service-account.json
+.env
