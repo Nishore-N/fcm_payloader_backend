@@ -138,7 +138,7 @@ async function sendFCM(data) {
 app.listen(PORT, () => {
     console.log(`\n🚀 Backend Server Running!`);
     console.log(`----------------------------------`);
-    console.log(`Standard JS   : http://localhost:${PORT}`);
+    console.log(`Standard JS   : https://fcm-payloader-frontend.onrender.com/`);
     console.log(`Vanilla TS    : http://localhost:${PORT}/ts`);
     console.log(`React TSX     : http://localhost:${PORT}/react`);
     console.log(`----------------------------------\n`);
