@@ -20,7 +20,22 @@ app.use((err, req, res, next) => {
 });
 
 app.use(cors({
-    origin: ['https://fcm-payloader-frontend.onrender.com', 'http://localhost:3000'],
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or direct API calls)
+        if (!origin) return callback(null, true);
+        
+        const isLocal = origin.includes('localhost') || 
+                        origin.includes('127.0.0.1') || 
+                        origin.match(/http:\/\/(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/);
+        
+        const allowedOrigins = ['https://fcm-payloader-frontend.onrender.com', 'http://localhost:3000'];
+        
+        if (isLocal || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -107,16 +122,15 @@ async function sendFCM(data) {
         message: {
             data: {
                 title: data.title,
+                subtitle: data.subtitle || '',
                 body: data.body,
                 app_name: data.appName || 'Application',
                 app_icon_text: data.appIconText || 'App',
                 app_icon_url: data.appIconUrl || '',
                 image_url: data.imageUrl || '',
                 card_type: data.cardType || '1',
-                button_type: data.buttonType || '1',
-                button_text: data.buttonText || 'Open',
-                button_action: data.deepLink || 'home',
-                deep_link: data.deepLink || 'home',
+                buttons: data.buttons ? JSON.stringify(data.buttons) : '[]',
+                notification_type: data.notificationType || 'notification',
                 persistent: 'true'
             },
             android: {
@@ -148,6 +162,45 @@ async function sendFCM(data) {
     console.log('FCM Response:', result);
     return result;
 }
+
+// Endpoint to fetch App Info from Flutter code
+app.get('/api/app-info', async (req, res) => {
+    try {
+        const manifestPath = path.join(__dirname, '../waytree-mobile/android/app/src/main/AndroidManifest.xml');
+        
+        if (!fs.existsSync(manifestPath)) {
+            // Fallback if Flutter folder is not found (e.g. in standalone backend deploy)
+            return res.json({ 
+                appName: 'WayTree', 
+                appIconText: 'WT',
+                source: 'fallback'
+            });
+        }
+
+        const content = await fs.readFile(manifestPath, 'utf-8');
+        const labelMatch = content.match(/android:label="([^"]+)"/);
+        const appName = labelMatch ? labelMatch[1] : 'WayTree';
+        
+        // Generate default initials
+        const appIconText = appName
+            .split(/[\s_-]+/) // Split by space, underscore, or hyphen
+            .map(word => word[0])
+            .join('')
+            .substring(0, 4)
+            .toUpperCase();
+        
+        const source = fs.existsSync(manifestPath) ? 'flutter' : 'fallback';
+        res.json({ 
+            appName, 
+            appIconText,
+            source: source
+        });
+        console.log(`Fetched App Info: ${appName} (${appIconText}) from ${source}`);
+    } catch (error) {
+        console.error('Error fetching app info:', error);
+        res.status(500).json({ error: 'Failed to fetch app info' });
+    }
+});
 
 // Catch-all for 404 (must be after all other routes)
 app.use((req, res) => {
